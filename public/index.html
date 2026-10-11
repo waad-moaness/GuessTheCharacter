@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guess the Character</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Archivo:wght@500;800&display=swap" rel="stylesheet">
+<style>
+/* ====== THEME: retro comedy-show look. Change these to restyle everything ====== */
+:root{
+  --bg:#f2e6c9;          /* aged-paper background */
+  --dots:#e4d3a8;        /* halftone dots */
+  --ink:#16120e;         /* outlines + text */
+  --paper:#fffaf0;       /* cards */
+  --accent:#ffc61a;      /* clue / highlights */
+  --hot:#e8321e;         /* main buttons */
+  --good:#3ccf91;        /* winner */
+  --blue:#2b5fd9;
+  --font-display:'Bowlby One','Arial Black',sans-serif;
+  --font-body:'Archivo',system-ui,sans-serif;
+  --line:3px solid var(--ink);
+  --pop:5px 5px 0 var(--ink);
+}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-weight:500;
+  background-image:radial-gradient(var(--dots) 2px,transparent 2.5px);background-size:16px 16px;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:520px;margin:0 auto;min-height:100%;padding:28px 28px 40px;display:flex;flex-direction:column;justify-content:center;gap:26px;text-align:center}
+h1,h2{font-family:var(--font-display);font-weight:400;line-height:1.02;text-transform:uppercase;letter-spacing:.5px}
+h1{font-size:clamp(34px,10.5vw,60px);margin:0 8px 6px;color:var(--hot);-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:5px 5px 0 var(--ink);transform:rotate(-2deg)}
+h2{font-size:clamp(28px,8vw,38px);text-shadow:3px 3px 0 var(--accent)}
+p{font-size:18px;line-height:1.4;font-weight:800}
+.muted{font-weight:500;font-size:15px;opacity:.8}
+.btn{font-family:var(--font-display);font-size:24px;text-transform:uppercase;border:var(--line);border-radius:14px;padding:15px 20px;cursor:pointer;
+  background:var(--hot);color:#fff;-webkit-text-stroke:1px var(--ink);paint-order:stroke fill;box-shadow:var(--pop);transition:transform .08s,box-shadow .08s;width:100%}
+.btn:active{transform:translate(5px,5px);box-shadow:0 0 0 var(--ink)}
+.btn.hot{background:var(--blue)}
+.btn.ghost{background:var(--paper);color:var(--ink);-webkit-text-stroke:0;font-size:18px;padding:12px}
+.btn.wa{background:#25d366;color:var(--ink);-webkit-text-stroke:0;font-size:18px;padding:12px 16px}
+.btn[disabled]{opacity:.5}
+input{width:100%;font:inherit;font-size:20px;font-weight:800;padding:14px 16px;border-radius:12px;border:var(--line);background:var(--paper);color:var(--ink);outline:none;box-shadow:3px 3px 0 var(--ink)}
+input:focus{background:#fff;box-shadow:3px 3px 0 var(--hot)}
+.card{background:var(--paper);border:var(--line);border-radius:16px;padding:16px;text-align:left;box-shadow:var(--pop)}
+.row{display:flex;gap:10px;align-items:center}
+.stack{display:flex;flex-direction:column;gap:12px}
+.clue{font-family:var(--font-display);text-transform:uppercase;font-size:clamp(28px,8vw,40px);line-height:1.1;background:var(--accent);color:var(--ink);padding:24px 18px;border:var(--line);border-radius:6px;transform:rotate(-1.5deg);box-shadow:8px 8px 0 var(--ink)}
+.big{font-family:var(--font-display);font-size:min(52vw,230px);line-height:1;color:var(--hot);-webkit-text-stroke:4px var(--ink);paint-order:stroke fill;text-shadow:8px 8px 0 var(--ink)}
+.timer{font-family:var(--font-display);font-size:60px;color:var(--ink);font-variant-numeric:tabular-nums;text-shadow:3px 3px 0 var(--accent)}
+.imgbox{background:var(--paper);border:var(--line);border-radius:10px;padding:10px;box-shadow:var(--pop)}
+.imgbox img{display:block;margin:0 auto;width:auto;height:auto;max-width:100%;max-height:min(58vh,520px);object-fit:contain;border-radius:6px;background:#ddd}
+.playwrap{display:flex;flex-direction:column;align-items:center;gap:18px}
+.playwrap .imgbox{width:fit-content;min-width:min(240px,100%);max-width:100%}
+.playwrap .btn{max-width:420px}
+@media (orientation:landscape) and (max-height:620px){
+  #app:has(.playwrap){padding:10px 18px;justify-content:center}
+  .playwrap{gap:10px}
+  .imgbox{padding:6px}
+  .imgbox img{max-height:calc(100dvh - 150px)}
+  .imgbox .nm{font-size:18px;padding-top:4px;line-height:1.1}
+  .playwrap .btn{padding:10px 16px;font-size:22px}
+}
+.imgbox .nm{font-family:var(--font-display);text-transform:uppercase;font-size:24px;padding-top:8px}
+.lb{display:flex;align-items:center;gap:12px;padding:10px 14px;border:var(--line);border-radius:14px;background:var(--paper);box-shadow:3px 3px 0 var(--ink)}
+.lb.win{background:var(--good)}
+.lb .rk{font-family:var(--font-display);font-size:28px;width:34px}
+.lb .who{flex:1;text-align:left;font-weight:800;font-size:19px;line-height:1.15}
+.lb .who small{display:block;font-weight:500;font-size:14px}
+.lb .tm{font-family:var(--font-display);font-size:22px;font-variant-numeric:tabular-nums}
+.lb .ph{width:52px;height:52px;border-radius:8px;border:2px solid var(--ink);object-fit:cover;background:#ddd}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:800;border:2px solid var(--ink);background:var(--paper)}
+.pill.ok{background:var(--good)}
+.err{color:#fff;background:var(--hot);border:var(--line);border-radius:12px;padding:10px;font-weight:800}
+.exit{position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:10;width:44px;height:44px;border-radius:50%;border:var(--line);background:var(--paper);color:var(--ink);font-family:var(--font-display);font-size:20px;line-height:1;cursor:pointer;box-shadow:3px 3px 0 var(--ink);display:none}
+.exit:active{transform:translate(3px,3px);box-shadow:none}
+.flash{animation:flash .5s ease-out}
+@keyframes flash{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.flash{animation:none}}
+</style>
+</head>
+<body>
+<button class="exit" id="exit" aria-label="Exit game" title="Exit game">&#10005;</button>
+<div id="app"></div>
+
+<script>
+const $app = document.getElementById('app');
+const qs = new URLSearchParams(location.search);
+let GID = qs.get('g'), PID = qs.get('p');
+let V = null;            // latest server view
+let local = 'intro';     // intro | clue | count | play | done
+let lastRound = null;
+let pollTimer = null;
+let t0 = 0, rafId = 0, imgData = null;
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = ms => ms == null ? 'no time' : (ms / 1000).toFixed(2) + 's';
+const api = async (path, opt) => { const r = await fetch(path, opt); const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Error'); return d; };
+const post = (path, data) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+let BASE = localStorage.getItem('gtc_base') || location.origin;
+const isLocal = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+async function initBase() {
+  if (localStorage.getItem('gtc_base')) return;
+  if (isLocal) {
+    try { const i = await api('/api/info'); if (i.lan.length) BASE = `http://${i.lan[0]}:${i.port}`; } catch (e) {}
+  }
+}
+const linkFor = id => `${BASE.replace(/\/+$/, '')}/?g=${GID}&p=${id}`;
+
+/* ---------- Exit / new session ---------- */
+function resetToHome() { location.href = location.origin + location.pathname; }
+document.getElementById('exit').onclick = async () => {
+  if (V && V.isHost) {
+    if (!confirm('Exit and end this game for everyone?')) return;
+    try { await post(`/api/game/${GID}/end`, { p: PID }); } catch (e) {}
+  } else if (!confirm('Exit this game? You can rejoin later with your link.')) return;
+  resetToHome();
+};
+function ended() {
+  clearInterval(pollTimer); cancelAnimationFrame(rafId);
+  document.getElementById('exit').style.display = 'none';
+  $app.innerHTML = `<h2>Game ended</h2><button class="btn" id="again">Start a new game</button>`;
+  document.getElementById('again').onclick = resetToHome;
+}
+
+/* ---------- Home & setup ---------- */
+function home() {
+  $app.innerHTML = `
+    <h1>Guess the<br>Character!</h1>
+    <button class="btn" id="new">New game</button>`;
+  document.getElementById('new').onclick = setup;
+}
+
+function setup() {
+  $app.innerHTML = `
+    <h2>Who's playing?</h2>
+    <div class="stack" id="names">
+      <input placeholder="Your name" maxlength="20" autocomplete="off">
+      <input placeholder="Friend 1" maxlength="20" autocomplete="off">
+    </div>
+    <button class="btn ghost" id="add">+ Add another friend</button>
+    <div id="msg"></div>
+    <button class="btn" id="go">Create game</button>`;
+  const box = document.getElementById('names');
+  document.getElementById('add').onclick = () => {
+    if (box.children.length >= 8) return;
+    const i = document.createElement('input');
+    i.placeholder = 'Friend ' + box.children.length; i.maxLength = 20; box.appendChild(i); i.focus();
+  };
+  document.getElementById('go').onclick = async () => {
+    const names = [...box.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean);
+    if (names.length < 2) return document.getElementById('msg').innerHTML = '<div class="err">Add your name and at least one friend.</div>';
+    try {
+      const r = await post('/api/create', { names });
+      GID = r.gameId; PID = r.hostId;
+      history.replaceState(null, '', `?g=${GID}&p=${PID}`);
+      await initBase(); local = 'invite'; startPolling();
+    } catch (e) { document.getElementById('msg').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+}
+
+/* ---------- Invite (host) ---------- */
+function invite() {
+  const friends = V.players.filter(p => !p.isMe);
+  const rows = friends.map(p => {
+    const link = linkFor(p.id);
+    const text = `${V.me.name} invited you to play Guess the Character! Tap your link to join: ${link}`;
+    return `<div class="card stack">
+      <div><b>${esc(p.name)}</b></div>
+      <a class="btn wa" style="text-decoration:none;display:block" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text)}">Send on WhatsApp</a>
+      <button class="btn ghost" data-copy="${esc(link)}" style="font-size:16px;padding:10px">Copy link</button>
+    </div>`;
+  }).join('');
+  $app.innerHTML = `
+    <h2>Invite your friends</h2>
+    ${rows}
+    <button class="btn" id="start">I'm ready, start</button>`;
+  $app.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied!'; } catch { prompt('Copy this link', b.dataset.copy); }
+  });
+  document.getElementById('start').onclick = () => { local = 'intro'; render(); };
+}
+
+/* ---------- Intro / welcome ---------- */
+function intro() {
+  const first = V.round === 1 && !V.isHost;
+  $app.innerHTML = `
+    ${first
+      ? `<h2>Hey ${esc(V.me.name)}!</h2><p><b>${esc(V.hostName)}</b> invited you to join a game of Guess the Character.</p>`
+      : `<h2>Round ${V.round}</h2>`}
+    <button class="btn" id="play">Start playing</button>
+    ${V.isHost ? '<button class="btn ghost" id="inv">Invite links</button>' : ''}
+    ${scoreboard()}`;
+  document.getElementById('play').onclick = () => { local = 'clue'; clue(); };
+  const inv = document.getElementById('inv'); if (inv) inv.onclick = () => { local = 'invite'; render(); };
+}
+
+/* ---------- Clue -> countdown -> play ---------- */
+function clue() {
+  $app.innerHTML = `
+    <p>Here's what your characters have in common:</p>
+    <div class="clue">${esc(V.clue)}</div>
+    <button class="btn" id="go">Start countdown</button>`;
+  document.getElementById('go').onclick = countdown;
+}
+
+const placeholder = t => 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="500"><rect width="600" height="500" fill="#ffc61a"/><text x="300" y="290" font-size="200" text-anchor="middle">🎭</text><text x="300" y="420" font-size="44" font-family="Arial Black" text-anchor="middle" fill="#16120e">${t.replace(/[<>&]/g,'')}</text></svg>`);
+const cleanName = n => n.replace(/\s*\(.*\)$/, '');
+const API = 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages|pageprops&ppprop=disambiguation&piprop=thumbnail&pithumbsize=700&';
+function preload(src) { return new Promise(ok => { const im = new Image(); im.onload = () => ok(true); im.onerror = () => ok(false); im.src = src; }); }
+async function wikiImage(name) {
+  // 1) exact page title
+  try {
+    const d = await (await fetch(API + 'titles=' + encodeURIComponent(name))).json();
+    const pg = Object.values((d.query && d.query.pages) || {})[0];
+    if (pg && pg.thumbnail && !(pg.pageprops && 'disambiguation' in pg.pageprops)) return pg.thumbnail.source;
+  } catch (e) {}
+  // 2) search by name, take the first result that has a picture
+  try {
+    const d = await (await fetch(API + 'generator=search&gsrlimit=5&gsrsearch=' + encodeURIComponent(cleanName(name)))).json();
+    const pages = Object.values((d.query && d.query.pages) || {}).sort((a, b) => a.index - b.index);
+    const words = cleanName(name).toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const hit = pages.find(p => p.thumbnail && words.some(w => p.title.toLowerCase().includes(w)));
+    if (hit) return hit.thumbnail.source;
+  } catch (e) {}
+  return null;
+}
+const cache = {};
+async function loadImage(name) {
+  const label = cleanName(name);
+  if (cache[name]) return cache[name];
+  const src = await wikiImage(name);
+  const out = { label, src: src && await preload(src) ? src : null };
+  if (out.src) cache[name] = out;
+  return out;
+}
+
+function enterPlayMode() {
+  try {
+    const go = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : Promise.resolve();
+    Promise.resolve(go).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
+  } catch (e) {}
+}
+function leavePlayMode() {
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+}
+function countdown() {
+  enterPlayMode();
+  local = 'count';
+  imgData = null;
+  loadImage(V.me.character).then(d => imgData = d);   // preload while counting
+  let n = 5;
+  const tick = () => {
+    $app.innerHTML = `<p>Turn your phone sideways and hold it on your forehead, screen facing out</p><div class="big flash">${n}</div>`;
+    if (n === 0) return showCharacter();
+    n--; setTimeout(tick, 1000);
+  };
+  tick();
+}
+
+async function showCharacter() {
+  if (!imgData) { // wait a little if image still loading
+    for (let i = 0; i < 30 && !imgData; i++) await new Promise(r => setTimeout(r, 100));
+    imgData = imgData || { label: V.me.character.replace(/\s*\(.*\)$/, ''), src: null };
+  }
+  local = 'play';
+  $app.id = 'app';
+  $app.innerHTML = `
+    <div class="playwrap">
+      <div class="imgbox">
+        <img src="${esc(imgData.src || placeholder(imgData.label))}" alt="">
+        <div class="nm">${esc(imgData.label)}</div>
+      </div>
+      <button class="btn hot" id="stop">I guessed it!</button>
+    </div>`;
+  t0 = performance.now();
+  document.getElementById('stop').onclick = async () => {
+    cancelAnimationFrame(rafId);
+    leavePlayMode();
+    const time = performance.now() - t0;
+    local = 'done';
+    $app.innerHTML = `<h2>${fmt(time)}</h2>`;
+    try { V = await post(`/api/game/${GID}/finish`, { p: PID, time }); } catch (e) {}
+    render();
+  };
+}
+
+/* ---------- Waiting & results ---------- */
+function scoreboard() {
+  if (V.round < 2 && V.players.every(p => !p.wins)) return '';
+  const s = V.players.slice().sort((a, b) => b.wins - a.wins);
+  return `<div class="card stack"><b>Session score</b>${s.map(p => `<div class="row"><span style="flex:1">${esc(p.name)}</span><b>${p.wins} ${p.wins === 1 ? 'win' : 'wins'}</b></div>`).join('')}</div>`;
+}
+
+function waiting() {
+  const list = V.players.map(p => `<div class="row"><span style="flex:1;text-align:left">${esc(p.name)}</span><span class="pill ${p.status === 'done' ? 'ok' : ''}">${p.status === 'done' ? 'Finished' : 'Still guessing'}</span></div>`).join('');
+  $app.innerHTML = `
+    <h2>${fmt(V.me.time)}</h2><p>Waiting for the others</p>
+    <div class="card stack">${list}</div>
+    ${V.isHost ? '<button class="btn ghost" id="force">Show results now</button>' : ''}`;
+  const f = document.getElementById('force');
+  if (f) f.onclick = async () => { V = await post(`/api/game/${GID}/force`, { p: PID }); render(); };
+}
+
+function results() {
+  const sorted = V.players.slice().sort((a, b) => (a.time ?? 1e12) - (b.time ?? 1e12));
+  const best = sorted[0] && sorted[0].time != null ? sorted[0] : null;
+  const rows = sorted.map((p, i) => `
+    <div class="lb ${best && p === best ? 'win' : ''}">
+      <div class="rk">${i + 1}</div>
+      <img class="ph" data-char="${esc(p.character || '')}" alt="" style="display:none">
+      <div class="who">${esc(p.name)}${p.isMe ? ' (you)' : ''}<small>was ${esc((p.character || '').replace(/\s*\(.*\)$/, ''))}</small></div>
+      <div class="tm">${fmt(p.time)}</div>
+    </div>`).join('');
+  $app.innerHTML = `
+    <h2>${best ? esc(best.name) + ' wins!' : 'No winner this time'}</h2>
+    <div class="stack">${rows}</div>
+    ${scoreboard()}
+    <button class="btn" id="next">Play another round</button>`;
+  $app.querySelectorAll('img.ph').forEach(im => loadImage(im.dataset.char).then(d => { if (d.src) { im.src = d.src; im.style.display = ''; } }));
+  document.getElementById('next').onclick = async () => { V = await post(`/api/game/${GID}/next`, { p: PID, round: V.round }); local = 'intro'; render(); };
+}
+
+/* ---------- Router & polling ---------- */
+function render() {
+  if (!V) return;
+  if (['clue', 'count', 'play'].includes(local)) return;
+  if (local === 'invite' && V.isHost) return invite();
+  if (V.phase === 'results') return results();
+  if (V.me.status === 'done') return waiting();
+  if (local === 'intro') return intro();
+}
+
+async function poll() {
+  try {
+    const nv = await api(`/api/game/${GID}?p=${PID}`);
+    const roundChanged = lastRound !== null && nv.round !== lastRound;
+    V = nv;
+    document.getElementById('exit').style.display = 'block';
+    if (roundChanged) { local = 'intro'; cancelAnimationFrame(rafId); }
+    lastRound = nv.round;
+    // avoid rebuilding the invite screen on every poll (keeps copy buttons stable)
+    if (local === 'invite' && $app.dataset.screen === 'invite') return;
+    render();
+    $app.dataset.screen = local === 'invite' && V.isHost ? 'invite' : '';
+  } catch (e) {
+    if (V && /not found/i.test(e.message)) return ended();
+    if (!V) { $app.innerHTML = `<h2>Oops</h2><p>We couldn't find this game. Ask your friend to send the link again.</p>`; clearInterval(pollTimer); }
+  }
+}
+function startPolling() { poll(); clearInterval(pollTimer); pollTimer = setInterval(poll, 1500); }
+
+if (GID && PID) startPolling(); else home();
+</script>
+</body>
+</html>
