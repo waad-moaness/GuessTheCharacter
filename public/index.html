@@ -227,10 +227,12 @@ async function wikiImage(name) {
   return null;
 }
 const cache = {};
-async function loadImage(name) {
+async function loadImage(name, given) {
   const label = cleanName(name);
   if (cache[name]) return cache[name];
-  const src = await wikiImage(name);
+  // Database characters come with their own official photo; hand-made ones are looked up on Wikipedia.
+  let src = given && await preload(given) ? given : null;
+  if (!src) src = await wikiImage(name);
   const out = { label, src: src && await preload(src) ? src : null };
   if (out.src) cache[name] = out;
   return out;
@@ -250,7 +252,7 @@ function countdown() {
   enterPlayMode();
   local = 'count';
   imgData = null;
-  loadImage(V.me.character).then(d => imgData = d);   // preload while counting
+  loadImage(V.me.character, V.me.image).then(d => imgData = d);   // preload while counting
   let n = 5;
   const tick = () => {
     $app.innerHTML = `<p>Turn your phone sideways and hold it on your forehead, screen facing out</p><div class="big flash">${n}</div>`;
@@ -310,7 +312,7 @@ function results() {
   const rows = sorted.map((p, i) => `
     <div class="lb ${best && p === best ? 'win' : ''}">
       <div class="rk">${i + 1}</div>
-      <img class="ph" data-char="${esc(p.character || '')}" alt="" style="display:none">
+      <img class="ph" data-char="${esc(p.character || '')}" data-img="${esc(p.image || '')}" alt="" style="display:none">
       <div class="who">${esc(p.name)}${p.isMe ? ' (you)' : ''}<small>was ${esc((p.character || '').replace(/\s*\(.*\)$/, ''))}</small></div>
       <div class="tm">${fmt(p.time)}</div>
     </div>`).join('');
@@ -319,7 +321,7 @@ function results() {
     <div class="stack">${rows}</div>
     ${scoreboard()}
     <button class="btn" id="next">Play another round</button>`;
-  $app.querySelectorAll('img.ph').forEach(im => loadImage(im.dataset.char).then(d => { if (d.src) { im.src = d.src; im.style.display = ''; } }));
+  $app.querySelectorAll('img.ph').forEach(im => loadImage(im.dataset.char, im.dataset.img).then(d => { if (d.src) { im.src = d.src; im.style.display = ''; } }));
   document.getElementById('next').onclick = async () => { V = await post(`/api/game/${GID}/next`, { p: PID, round: V.round }); local = 'intro'; render(); };
 }
 

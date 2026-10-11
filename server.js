@@ -21,6 +21,31 @@ const CATEGORIES = [
   { clue: 'They are all famous leaders or historic figures', items: ['Cleopatra','Napoleon','Julius Caesar','Alexander the Great','Abraham Lincoln','Winston Churchill','Nelson Mandela','Genghis Khan','Queen Victoria','Mahatma Gandhi','Tutankhamun','Ramesses II'] },
 ];
 
+// ---- Generated database (node build-database.js) + the hand-made list above ----
+function loadCategories() {
+  const all = CATEGORIES.map(c => ({ clue: c.clue, items: c.items.map(name => ({ name })) }));   // hand-made: photo looked up on the phone
+  try {
+    const db = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'characters.json'), 'utf8'));
+    const good = (db.categories || []).filter(c => c.items && c.items.length >= 6);
+    if (good.length >= 5) all.length = 0;          // a proper database exists: drop the old built-in list (it has no photos for cartoon characters)
+    // Clues can be edited in my-categories.json without rebuilding: match each database category to the entry with the most shared names
+    try {
+      const strip = n => n.replace(/\s*\(.*\)$/, '').toLowerCase();
+      const mine = JSON.parse(fs.readFileSync(path.join(__dirname, 'my-categories.json'), 'utf8'))
+        .map(m => ({ clue: m.clue, names: new Set(m.items.map(i => strip(typeof i === 'object' ? i.name : i))) }));
+      for (const c of good) {
+        let best = null, score = 0;
+        for (const m of mine) { const s = c.items.filter(i => m.names.has(strip(i.name))).length; if (s > score) { score = s; best = m; } }
+        if (best && score >= Math.min(4, c.items.length)) c.clue = best.clue;
+      }
+    } catch (e) {}
+    all.push(...good);
+    console.log(`Loaded ${all.length} categories from data/characters.json`);
+  } catch (e) { console.log('No data/characters.json yet - using the built-in list. Run: node build-database.js'); }
+  return all;
+}
+const ALL_CATEGORIES = loadCategories();
+
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 const uid = (n = 6) => crypto.randomBytes(n).toString('hex').slice(0, n);
 
@@ -28,15 +53,17 @@ function startRound(game) {
   game.round++;
   game.phase = 'playing';
   game.winnerIds = [];
-  const unused = CATEGORIES.map((_, i) => i).filter(i => !game.usedCats.includes(i));
-  const pool = unused.length ? unused : CATEGORIES.map((_, i) => i);
-  if (!unused.length) game.usedCats = [];
+  const n = game.players.length;
+  let eligible = ALL_CATEGORIES.map((c, i) => i).filter(i => ALL_CATEGORIES[i].items.length >= n);
+  if (!eligible.length) eligible = ALL_CATEGORIES.map((c, i) => i);   // safety net
+  let pool = eligible.filter(i => !game.usedCats.includes(i));
+  if (!pool.length) { game.usedCats = []; pool = eligible; }
   const ci = pool[crypto.randomInt(pool.length)];
   game.usedCats.push(ci);
-  const cat = CATEGORIES[ci];
+  const cat = ALL_CATEGORIES[ci];
   game.clue = cat.clue;
   const chars = shuffle(cat.items);
-  game.players.forEach((p, i) => { p.character = chars[i]; p.status = 'waiting'; p.time = null; });
+  game.players.forEach((p, i) => { p.character = chars[i % chars.length].name; p.image = chars[i % chars.length].image || null; p.status = 'waiting'; p.time = null; });
 }
 
 function finishRound(game) {
@@ -61,7 +88,7 @@ function view(game, pid) {
   return {
     id: game.id, round: game.round, phase: game.phase, clue: game.clue,
     hostName: game.players[0].name, isHost,
-    me: { id: me.id, name: me.name, status: me.status, time: me.time, character: me.character },
+    me: { id: me.id, name: me.name, status: me.status, time: me.time, character: me.character, image: me.image },
     ranked, winnerIds: game.winnerIds,
     players: game.players.map(p => ({
       id: isHost ? p.id : undefined,
@@ -69,6 +96,7 @@ function view(game, pid) {
       name: p.name, status: p.status, wins: game.scores[p.id] || 0,
       time: results ? p.time : null,
       character: results ? p.character : null,
+      image: results ? p.image : null,
     })),
   };
 }
@@ -91,7 +119,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && parts[1] === 'create') {
       const { names } = await body(req);
       const clean = (names || []).map(n => String(n).trim().slice(0, 20)).filter(Boolean);
-      if (clean.length < 2 || clean.length > 8) return json(res, 400, { error: 'Need 2-8 players' });
+      if (clean.length < 2 || clean.length > 7) return json(res, 400, { error: 'Need 2-7 players' });
       const game = { id: uid(5), created: Date.now(), round: 0, phase: 'playing', scores: {}, usedCats: [], winnerIds: [],
         players: clean.map(n => ({ id: uid(8), name: n, status: 'waiting', time: null, character: null })) };
       startRound(game);
@@ -128,18 +156,20 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // static: serve from ./public, or from the same folder as server.js if the files were saved flat
-  const name = path.basename(url.pathname === '/' ? 'index.html' : url.pathname);
-  const candidates = [path.join(__dirname, 'public', name), path.join(__dirname, name)];
-  const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml' };
+  // static: ./public (or same folder as server.js if files were saved flat); photos live in public/images
+  const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
+  const safe = path.normalize(rel).replace(/^(\.\.[\/\\])+/, '');
+  const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+  const candidates = [path.join(__dirname, 'public', safe), path.join(__dirname, path.basename(safe))];
   const tryNext = i => {
-    if (i >= candidates.length) {
+    const f = candidates[i];
+    if (!f || !/\.(html|css|js|png|jpe?g|webp|svg)$/i.test(f) || /server\.js$|build-database\.js$/.test(f)) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      return res.end('index.html not found. Put it next to server.js (or inside a folder named "public" next to server.js).\nLooked in:\n' + candidates.join('\n'));
+      return res.end('Not found. (index.html must be next to server.js or inside a folder named "public")');
     }
-    fs.readFile(candidates[i], (err, data) => {
-      if (err || name === 'server.js' || name === 'package.json') return tryNext(i + 1);
-      res.writeHead(200, { 'Content-Type': (types[path.extname(name)] || 'text/plain') + '; charset=utf-8' });
+    fs.readFile(f, (err, data) => {
+      if (err) return tryNext(i + 1);
+      res.writeHead(200, { 'Content-Type': (types[path.extname(f).toLowerCase()] || 'text/plain') + '; charset=utf-8' });
       res.end(data);
     });
   };

@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Multiplayer phone-on-forehead guessing game",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=16" }
+  "scripts": {
+    "start": "node server.js",
+    "build-db": "node build-database.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
 }
